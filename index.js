@@ -2,62 +2,57 @@ const express = require("express");
 const multer = require("multer");
 const csv = require("csv-parser");
 const fs = require("fs");
-const path = require("path");
 const cors = require("cors");
 const pool = require("./db");
 
 const app = express();
-app.use(cors());
 
-// pastikan folder uploads ada (Railway tidak membuat otomatis)
+// Setup CORS agar hanya frontend Vercel yang boleh
+app.use(cors({
+  origin: "https://vercelupload-p8rkr1mi1-fathars-projects.vercel.app",
+  methods: ["POST"],
+  allowedHeaders: ["Content-Type"]
+}));
+
+// Pastikan folder upload ada
 if (!fs.existsSync("./uploads")) {
   fs.mkdirSync("./uploads");
 }
 
-// Multer untuk menyimpan file upload
 const upload = multer({ dest: "uploads/" });
 
-// Endpoint upload CSV
 app.post("/upload-csv", upload.single("file"), async (req, res) => {
   const filePath = req.file.path;
   const results = [];
 
   fs.createReadStream(filePath)
     .pipe(csv())
-    .on("data", (data) => {
-      results.push(data);
-    })
+    .on("data", (row) => results.push(row))
     .on("end", async () => {
       try {
-        for (let row of results) {
+        for (const r of results) {
           await pool.query(
-            `INSERT INTO pegawai 
-              (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
-              VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            `INSERT INTO pegawai (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [
-              row.nomor_surat,
-              row.nama_pegawai,
-              row.nip,
-              row.status_verifikasi,
-              row.created_at,
-              row.jabatan,
-              row.perihal,
+              r.nomor_surat,
+              r.nama_pegawai,
+              r.nip,
+              r.status_verifikasi,
+              r.created_at,
+              r.jabatan,
+              r.perihal
             ]
           );
         }
-
         fs.unlinkSync(filePath);
-
-        res.json({
-          message: "Data CSV berhasil diupload dan disimpan ke database!",
-        });
-      } catch (error) {
-        console.error("DATABASE ERROR:", error);
-        res.status(500).json({ error: "Gagal menyimpan data ke database" });
+        res.json({ message: "Data CSV berhasil disimpan." });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Gagal menyimpan data." });
       }
     });
 });
 
-// Jalankan server (FIX untuk Railway)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server berjalan di port ${PORT}`));
