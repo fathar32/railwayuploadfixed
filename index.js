@@ -2,11 +2,17 @@ const express = require("express");
 const multer = require("multer");
 const csv = require("csv-parser");
 const fs = require("fs");
+const path = require("path");
 const cors = require("cors");
 const pool = require("./db");
 
 const app = express();
 app.use(cors());
+
+// pastikan folder uploads ada (Railway tidak membuat otomatis)
+if (!fs.existsSync("./uploads")) {
+  fs.mkdirSync("./uploads");
+}
 
 // Multer untuk menyimpan file upload
 const upload = multer({ dest: "uploads/" });
@@ -40,15 +46,18 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
           );
         }
 
-        fs.unlinkSync(filePath); // hapus file setelah diproses
+        fs.unlinkSync(filePath);
 
-        res.json({ message: "Data CSV berhasil diupload dan disimpan ke database!" });
+        res.json({
+          message: "Data CSV berhasil diupload dan disimpan ke database!",
+        });
       } catch (error) {
-        console.error(error);
+        console.error("DATABASE ERROR:", error);
         res.status(500).json({ error: "Gagal menyimpan data ke database" });
       }
     });
 });
 
-// Jalankan server
-app.listen(3000, () => console.log("Server berjalan di http://localhost:3000"));
+// Jalankan server (FIX untuk Railway)
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server berjalan di port ${PORT}`));
