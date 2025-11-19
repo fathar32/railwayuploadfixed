@@ -7,31 +7,21 @@ const pool = require("./db");
 
 const app = express();
 
-// CORS aman untuk semua domain
-app.use(cors({
-  origin: "*",
-  methods: "GET,POST,OPTIONS",
-  allowedHeaders: "Content-Type"
-}));
-
+// CORS global — options akan ditangani otomatis oleh middleware ini
+app.use(cors());
 app.use(express.json());
-
-// Handler OPTIONS global (Express v5 tidak boleh "*")
-app.options("/*", (req, res) => {
-  res.sendStatus(200);
-});
 
 // Buat folder uploads jika belum ada
 if (!fs.existsSync("./uploads")) {
   fs.mkdirSync("./uploads");
 }
 
-// Multer setup
+// Multer
 const upload = multer({ dest: "uploads/" });
 
 // Root endpoint
 app.get("/", (req, res) => {
-  res.send("API READY - Railway Anti-Idle Version");
+  res.send("API READY - Express v5 FIXED");
 });
 
 // Upload CSV
@@ -47,7 +37,6 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
     .pipe(csv())
     .on("data", (data) => results.push(data))
     .on("end", async () => {
-
       try {
         for (let row of results) {
           await pool.query(
@@ -76,15 +65,6 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
     });
 });
 
-// Anti-crash Railway (stop signal)
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received. Shutting down...");
-});
-
-process.on("SIGINT", () => {
-  console.log("SIGINT received. Exiting...");
-});
-
-// Railway port
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log("Server berjalan di port", PORT));
+// Anti-crash Railway
+process.on("SIGTERM", () => console.log("SIGTERM received. Shutting down..."));
+process.on("SIGINT", ()
