@@ -1,99 +1,76 @@
-import express from "express";
-import pg from "pg";
-import multer from "multer";
-import csvParser from "csv-parser";
-import fs from "fs";
-import path from "path";
+const express = require("express");
+const multer = require("multer");
+const csv = require("csv-parser");
+const fs = require("fs");
+const cors = require("cors");
+const pool = require("./db");
 
-const __dirname = path.resolve();
 const app = express();
-
-// ====== DATABASE ======
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-// ====== MIDDLEWARE ======
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// CORS Biar Frontend Aman
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  next();
-});
+// pastikan folder uploads ada
+if (!fs.existsSync("./uploads")) {
+  fs.mkdirSync("./uploads");
+}
 
-// Folder Upload
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// Multer setup
+// multer setup
 const upload = multer({ dest: "uploads/" });
 
-// ====== ROUTES ======
 app.get("/", (req, res) => {
-  res.send("API is running (Railway alive).");
+  res.send("API READY - Railway Anti-Idle Version");
 });
 
-
-/* -----------------------
-   UPLOAD CSV
-------------------------*/
+// CSV upload route
 app.post("/upload-csv", upload.single("file"), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ message: "File CSV tidak ditemukan" });
+    return res.status(400).json({ error: "No file uploaded" });
   }
 
   const filePath = req.file.path;
   const results = [];
 
   fs.createReadStream(filePath)
-    .pipe(csvParser())
-    .on("data", (row) => results.push(row))
+    .pipe(csv())
+    .on("data", (data) => results.push(data))
     .on("end", async () => {
       try {
-        for (const row of results) {
+        for (let row of results) {
           await pool.query(
             `INSERT INTO pegawai 
             (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
             [
-              row.nomor_surat,
-              row.nama_pegawai,
-              row.nip,
-              row.status_verifikasi,
-              row.created_at,
-              row.jabatan,
-              row.perihal,
+              row.nomor_surat || null,
+              row.nama_pegawai || null,
+              row.nip || null,
+              row.status_verifikasi || null,
+              row.created_at || new Date(),
+              row.jabatan || null,
+              row.perihal || null
             ]
           );
         }
 
         fs.unlinkSync(filePath);
-        res.json({ message: "Data CSV berhasil diupload!" });
+        res.json({ message: "CSV berhasil diproses!" });
 
       } catch (err) {
         console.error("DB ERROR:", err);
         res.status(500).json({ error: "Gagal menyimpan data" });
       }
-    })
-    .on("error", (err) => {
-      console.log("CSV ERROR:", err);
-      res.status(500).json({ error: "File CSV rusak" });
     });
 });
 
-// ====== KEEP ALIVE (ANTI-IDLE) ======
-setInterval(() => {
-  fetch("https://railwayuploadfixed-production.up.railway.app/")
-    .then(() => console.log("Keep-alive ping sent"))
-    .catch(() => {});
-}, 1000 * 60 * 5); // setiap 5 menit
-
-// ====== START SERVER ======
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`Server berjalan di port ${PORT}`);
+// SIGTERM handler — anti crash saat stop
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received. Shutting down...");
 });
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received. Exiting...");
+});
+
+// Railway PORT
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log("Server berjalan di port", PORT));
