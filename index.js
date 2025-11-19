@@ -6,53 +6,53 @@ const cors = require("cors");
 const pool = require("./db");
 
 const app = express();
+app.use(cors());
+app.use(express.json());
 
-// Setup CORS agar hanya frontend Vercel yang boleh
-app.use(cors({
-  origin: "https://vercelupload-p8rkr1mi1-fathars-projects.vercel.app",
-  methods: ["POST"],
-  allowedHeaders: ["Content-Type"]
-}));
+app.get("/", (req, res) => {
+  res.send("API is running!");
+});
 
-// Pastikan folder upload ada
-if (!fs.existsSync("./uploads")) {
-  fs.mkdirSync("./uploads");
-}
-
+// Multer
 const upload = multer({ dest: "uploads/" });
 
+// Upload CSV
 app.post("/upload-csv", upload.single("file"), async (req, res) => {
   const filePath = req.file.path;
   const results = [];
 
   fs.createReadStream(filePath)
     .pipe(csv())
-    .on("data", (row) => results.push(row))
+    .on("data", (data) => results.push(data))
     .on("end", async () => {
       try {
-        for (const r of results) {
+        for (let row of results) {
           await pool.query(
-            `INSERT INTO pegawai (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            `INSERT INTO pegawai 
+            (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
+            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
             [
-              r.nomor_surat,
-              r.nama_pegawai,
-              r.nip,
-              r.status_verifikasi,
-              r.created_at,
-              r.jabatan,
-              r.perihal
+              row.nomor_surat,
+              row.nama_pegawai,
+              row.nip,
+              row.status_verifikasi,
+              row.created_at,
+              row.jabatan,
+              row.perihal,
             ]
           );
         }
+
         fs.unlinkSync(filePath);
-        res.json({ message: "Data CSV berhasil disimpan." });
+        res.json({ message: "Data CSV berhasil diupload!" });
+
       } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Gagal menyimpan data." });
+        res.status(500).json({ error: "Gagal menyimpan data" });
       }
     });
 });
 
+// PORT Railway
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server berjalan di port ${PORT}`));
+app.listen(PORT, () => console.log("Server berjalan di port " + PORT));
