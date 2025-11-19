@@ -9,6 +9,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Pastikan folder uploads ada
+const dir = "./uploads";
+if (!fs.existsSync(dir)) {
+  fs.mkdirSync(dir);
+}
+
 app.get("/", (req, res) => {
   res.send("API is running!");
 });
