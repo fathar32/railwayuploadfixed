@@ -10,6 +10,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Create uploads folder if not exists
 if (!fs.existsSync("./uploads")) {
   fs.mkdirSync("./uploads");
 }
@@ -18,7 +19,7 @@ const upload = multer({ dest: "uploads/" });
 
 // Root
 app.get("/", (req, res) => {
-  res.send("API READY - KEEP ALIVE ENABLED");
+  res.send("API READY - KEEPALIVE ACTIVE");
 });
 
 // Upload CSV
@@ -60,18 +61,20 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
     });
 });
 
-// ---- KEEP ALIVE (AGAR RAILWAY TIDAK IDLE) ----
+// ---- KEEP ALIVE FIXED (AMAN UNTUK RAILWAY) ----
 setInterval(() => {
-  const url = `https://${process.env.RAILWAY_STATIC_URL || "localhost:8080"}`;
+  const url = "https://railwayuploadfixed-production.up.railway.app/";
 
   fetch(url)
-    .then(() => console.log("Keepalive ping sent to:", url))
-    .catch(err => console.log("Keepalive error:", err.message));
-}, 4 * 60 * 1000); // setiap 4 menit
+    .then(() => console.log("KeepAlive sent →", url))
+    .catch((err) =>
+      console.log("KeepAlive error:", err.message)
+    );
+}, 4 * 60 * 1000); // 4 menit
 
 // Anti Crash
-process.on("SIGTERM", () => console.log("SIGTERM diterima."));
-process.on("SIGINT", () => console.log("SIGINT diterima."));
+process.on("SIGTERM", () => console.log("SIGTERM diterima"));
+process.on("SIGINT", () => console.log("SIGINT diterima"));
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log("Server berjalan di port", PORT));
