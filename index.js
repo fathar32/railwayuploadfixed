@@ -7,24 +7,28 @@ const pool = require("./db");
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Create uploads folder if not exists
+// Buat folder upload jika belum ada
 if (!fs.existsSync("./uploads")) {
   fs.mkdirSync("./uploads");
 }
 
+// Multer
 const upload = multer({ dest: "uploads/" });
 
-// Root
+// Root endpoint
 app.get("/", (req, res) => {
-  res.send("API READY - KEEPALIVE ACTIVE");
+  res.send("API READY - RAILWAY STABLE VERSION");
 });
 
 // Upload CSV
 app.post("/upload-csv", upload.single("file"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
 
   const filePath = req.file.path;
   const results = [];
@@ -37,8 +41,8 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
         for (let row of results) {
           await pool.query(
             `INSERT INTO pegawai 
-              (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
-             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
+            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
             [
               row.nomor_surat || null,
               row.nama_pegawai || null,
@@ -61,20 +65,19 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
     });
 });
 
-// ---- KEEP ALIVE FIXED (AMAN UNTUK RAILWAY) ----
+// ------------------------------------------------------------------
+// ✔ KEEP ALIVE — ANTI IDLE — 100% AMAN UNTUK RAILWAY
+// ------------------------------------------------------------------
 setInterval(() => {
-  const url = "https://railwayuploadfixed-production.up.railway.app/";
+  fetch("https://railwayuploadfixed-production.up.railway.app/")
+    .then(() => console.log("KeepAlive → OK"))
+    .catch(err => console.log("KeepAlive error:", err.message));
+}, 4 * 60 * 1000); // setiap 4 menit
 
-  fetch(url)
-    .then(() => console.log("KeepAlive sent →", url))
-    .catch((err) =>
-      console.log("KeepAlive error:", err.message)
-    );
-}, 4 * 60 * 1000); // 4 menit
+// Anti crash Railway
+process.on("SIGTERM", () => console.log("SIGTERM diterima, shutdown..."));
+process.on("SIGINT", () => console.log("SIGINT diterima, exit..."));
 
-// Anti Crash
-process.on("SIGTERM", () => console.log("SIGTERM diterima"));
-process.on("SIGINT", () => console.log("SIGINT diterima"));
-
+// Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log("Server berjalan di port", PORT));
