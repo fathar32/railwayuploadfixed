@@ -7,28 +7,23 @@ const pool = require("./db");
 
 const app = express();
 
-// CORS global
 app.use(cors());
 app.use(express.json());
 
-// Buat folder uploads jika belum ada
 if (!fs.existsSync("./uploads")) {
   fs.mkdirSync("./uploads");
 }
 
-// Multer
 const upload = multer({ dest: "uploads/" });
 
-// Root endpoint
+// Root
 app.get("/", (req, res) => {
-  res.send("API READY - Express v5 FINAL");
+  res.send("API READY - KEEP ALIVE ENABLED");
 });
 
 // Upload CSV
 app.post("/upload-csv", upload.single("file"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   const filePath = req.file.path;
   const results = [];
@@ -41,8 +36,8 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
         for (let row of results) {
           await pool.query(
             `INSERT INTO pegawai 
-            (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
-            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+              (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
             [
               row.nomor_surat || null,
               row.nama_pegawai || null,
@@ -65,14 +60,18 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
     });
 });
 
-// Anti-crash Railway
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received. Shutting down...");
-});
+// ---- KEEP ALIVE (AGAR RAILWAY TIDAK IDLE) ----
+setInterval(() => {
+  const url = `https://${process.env.RAILWAY_STATIC_URL || "localhost:8080"}`;
 
-process.on("SIGINT", () => {
-  console.log("SIGINT received. Exiting...");
-});
+  fetch(url)
+    .then(() => console.log("Keepalive ping sent to:", url))
+    .catch(err => console.log("Keepalive error:", err.message));
+}, 4 * 60 * 1000); // setiap 4 menit
+
+// Anti Crash
+process.on("SIGTERM", () => console.log("SIGTERM diterima."));
+process.on("SIGINT", () => console.log("SIGINT diterima."));
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log("Server berjalan di port", PORT));
