@@ -1,109 +1,88 @@
 const express = require("express");
-const cors = require("cors");
 const multer = require("multer");
+const csv = require("csv-parser");
 const fs = require("fs");
+const cors = require("cors");
 const pool = require("./db");
 
 const app = express();
 
-// =============================
-// 🔥 CORS SUPER FIXED 🔥
-// =============================
+// CORS (AMAN UNTUK VERCEL)
 app.use(cors({
-  origin: [
-    "https://verceluploadfixied.vercel.app", // frontend kamu
-    "http://localhost:3000"
-  ],
+  origin: ["https://verceluploadfixied.vercel.app", "*"],
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"],
-  preflightContinue: false,
-  optionsSuccessStatus: 200
 }));
-
-app.options("*", cors()); // Preflight OPTIONS fix
 
 app.use(express.json());
 
-// Multer setup
+// Buat folder uploads jika belum ada
+if (!fs.existsSync("./uploads")) {
+  fs.mkdirSync("./uploads");
+}
+
+// Multer
 const upload = multer({ dest: "uploads/" });
 
-// =============================
-// 🔥 ROOT ENDPOINT
-// =============================
+// Root test
 app.get("/", (req, res) => {
-  res.json({ status: "Server OK", time: new Date().toISOString() });
+  res.json({ status: "OK", message: "Server berjalan normal" });
 });
 
-// =============================
-// 🔥 KEEP-ALIVE Railway
-// =============================
-setInterval(() => {
-  console.log("KeepAlive → OK");
-}, 1000 * 60 * 4); // 4 menit
-
-// =============================
-// 🔥 UPLOAD CSV
-// =============================
+// Upload CSV
 app.post("/upload-csv", upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "Tidak ada file yang diupload" });
-    }
-
-    const csvContent = fs.readFileSync(req.file.path, "utf8");
-    const lines = csvContent.split(/\r?\n/).filter(l => l.trim() !== "");
-
-    if (lines.length < 2) {
-      return res.status(400).json({ error: "CSV kosong atau tidak valid" });
-    }
-
-    const headers = lines[0].split(",").map(h => h.trim());
-    const expected = [
-      "nomor_surat",
-      "nama_pegawai",
-      "nip",
-      "status_verifikasi",
-      "created_at",
-      "jabatan",
-      "perihal"
-    ];
-
-    // Validasi header
-    for (const h of expected) {
-      if (!headers.includes(h)) {
-        return res.status(400).json({ error: `Header hilang: ${h}` });
-      }
-    }
-
-    const client = await pool.connect();
-
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",").map(c => c.trim());
-      if (cols.length < 7) continue;
-
-      await client.query(
-        `INSERT INTO uploads 
-        (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
-        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        cols
-      );
-    }
-
-    client.release();
-    fs.unlinkSync(req.file.path);
-
-    res.json({ message: "CSV berhasil disimpan ke database!" });
-
-  } catch (err) {
-    console.error("CSV ERROR:", err);
-    res.status(500).json({ error: "Gagal memproses CSV" });
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
   }
+
+  const filePath = req.file.path;
+  const results = [];
+
+  fs.createReadStream(filePath)
+    .pipe(csv())
+    .on("data", (data) => results.push(data))
+    .on("end", async () => {
+      try {
+        for (let row of results) {
+          await pool.query(
+            `INSERT INTO pegawai 
+            (nomor_surat, nama_pegawai, nip, status_verifikasi, created_at, jabatan, perihal)
+            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [
+              row.nomor_surat || null,
+              row.nama_pegawai || null,
+              row.nip || null,
+              row.status_verifikasi || null,
+              row.created_at || new Date(),
+              row.jabatan || null,
+              row.perihal || null,
+            ]
+          );
+        }
+
+        fs.unlinkSync(filePath);
+        res.json({ message: "CSV berhasil diproses!" });
+
+      } catch (err) {
+        console.error("DB ERROR:", err);
+        res.status(500).json({ error: "Gagal menyimpan data ke database" });
+      }
+    });
 });
 
-// =============================
-// 🔥 SERVER
-// =============================
+// Keep-alive untuk Railway
+setInterval(() => {
+  fetch("https://railwayuploadfixed-production.up.railway.app/")
+    .then(() => console.log("KeepAlive → OK"))
+    .catch(() => {});
+}, 280000); // 4 menit 40 detik
+
+// Anti-crash Railway
+process.on("SIGTERM", () => console.log("SIGTERM received"));
+process.on("SIGINT", () => console.log("SIGINT received"));
+
+// LISTEN WAJIB 0.0.0.0 !!!
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log("Server berjalan di port", PORT);
 });
