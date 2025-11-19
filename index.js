@@ -7,31 +7,34 @@ const pool = require("./db");
 
 const app = express();
 
-// FIX PENTING UNTUK CORS
+// CORS aman untuk semua domain
 app.use(cors({
-  origin: "https://verceluploadfixied.vercel.app",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
+  origin: "*",
+  methods: "GET,POST,OPTIONS",
+  allowedHeaders: "Content-Type"
 }));
-
-// izinkan preflight
-app.options("*", cors());
 
 app.use(express.json());
 
-// pastikan folder uploads ada
+// Handler OPTIONS global (Express v5 tidak boleh "*")
+app.options("/*", (req, res) => {
+  res.sendStatus(200);
+});
+
+// Buat folder uploads jika belum ada
 if (!fs.existsSync("./uploads")) {
   fs.mkdirSync("./uploads");
 }
 
-// multer setup
+// Multer setup
 const upload = multer({ dest: "uploads/" });
 
+// Root endpoint
 app.get("/", (req, res) => {
   res.send("API READY - Railway Anti-Idle Version");
 });
 
-// CSV upload route
+// Upload CSV
 app.post("/upload-csv", upload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded" });
@@ -44,6 +47,7 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
     .pipe(csv())
     .on("data", (data) => results.push(data))
     .on("end", async () => {
+
       try {
         for (let row of results) {
           await pool.query(
@@ -67,12 +71,12 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
 
       } catch (err) {
         console.error("DB ERROR:", err);
-        res.status(500).json({ error: "Gagal menyimpan data" });
+        res.status(500).json({ error: "Gagal menyimpan data ke database" });
       }
     });
 });
 
-// SIGTERM handler — anti crash saat stop
+// Anti-crash Railway (stop signal)
 process.on("SIGTERM", () => {
   console.log("SIGTERM received. Shutting down...");
 });
@@ -81,6 +85,6 @@ process.on("SIGINT", () => {
   console.log("SIGINT received. Exiting...");
 });
 
-// Railway PORT
+// Railway port
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log("Server berjalan di port", PORT));
