@@ -7,7 +7,7 @@ const pool = require("./db");
 
 const app = express();
 
-// CORS global — options akan ditangani otomatis oleh middleware ini
+// CORS global
 app.use(cors());
 app.use(express.json());
 
@@ -21,7 +21,7 @@ const upload = multer({ dest: "uploads/" });
 
 // Root endpoint
 app.get("/", (req, res) => {
-  res.send("API READY - Express v5 FIXED");
+  res.send("API READY - Express v5 FINAL");
 });
 
 // Upload CSV
@@ -66,5 +66,13 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
 });
 
 // Anti-crash Railway
-process.on("SIGTERM", () => console.log("SIGTERM received. Shutting down..."));
-process.on("SIGINT", ()
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received. Shutting down...");
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received. Exiting...");
+});
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log("Server berjalan di port", PORT));
