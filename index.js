@@ -7,7 +7,10 @@ const csv = require("csv-parser");
 const fs = require("fs");
 const cors = require("cors");
 const pool = require("./db");
-const fetch = require("node-fetch"); // Untuk Railway keep-alive
+
+// FIX: node-fetch harus pakai dynamic import
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 const app = express();
 
@@ -15,11 +18,7 @@ const app = express();
 // CORS (AMAN UNTUK VERCEL & LOCALHOST)
 // ==========================
 app.use(cors({
-  origin: [
-    "https://verceluploadfixied.vercel.app",
-    "http://localhost:3000",
-    "*"
-  ],
+  origin: "*",
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"],
 }));
@@ -94,7 +93,7 @@ setInterval(() => {
   fetch("https://railwayuploadfixed-production.up.railway.app/")
     .then(() => console.log("KeepAlive → OK"))
     .catch(() => {});
-}, 280000); // 4 menit 40 detik
+}, 280000);
 
 // ==========================
 // ANTI-CRASH RAILWAY
