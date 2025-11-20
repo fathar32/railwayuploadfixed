@@ -8,10 +8,6 @@ const fs = require("fs");
 const cors = require("cors");
 const pool = require("./db");
 
-// FIX: node-fetch harus pakai dynamic import
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
-
 const app = express();
 
 // ==========================
