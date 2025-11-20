@@ -11,48 +11,48 @@ const pool = require("./db");
 const app = express();
 
 // ==========================
-// CORS (AMAN UNTUK VERCEL & LOCALHOST)
+// CORS AMAN UNTUK VERCEL & SEMUA DOMAIN
 // ==========================
-app.use(cors({
-  origin: "https://verceluploadfixied.vercel.app",
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"],
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => callback(null, true), // izinkan semua origin
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
 
 app.use(express.json());
 
 // ==========================
-// BUAT FOLDER UPLOADS JIKA BELUM ADA
+// TEMP FOLDER UNTUK RAILWAY
 // ==========================
-if (!fs.existsSync("./uploads")) {
-  fs.mkdirSync("./uploads");
+const uploadDir = "/tmp/uploads";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Multer
-const upload = multer({ dest: "uploads/" });
+// Multer ke folder yang aman
+const upload = multer({ dest: uploadDir });
 
 // ==========================
-// ROUTE ROOT
+// TEST ROOT
 // ==========================
 app.get("/", (req, res) => {
   res.json({ status: "OK", message: "Server berjalan normal" });
 });
 
 // ==========================
-// UPLOAD CSV → INPUT DATABASE
+// UPLOAD CSV → DATABASE
 // ==========================
 app.post("/upload-csv", upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
-
-  const filePath = req.file.path;
+  const path = req.file.path;
   const results = [];
 
-  fs.createReadStream(filePath)
+  fs.createReadStream(path)
     .pipe(csv())
-    .on("data", (data) => results.push(data))
+    .on("data", (row) => results.push(row))
     .on("end", async () => {
       try {
         for (let row of results) {
@@ -72,30 +72,14 @@ app.post("/upload-csv", upload.single("file"), async (req, res) => {
           );
         }
 
-        fs.unlinkSync(filePath);
+        fs.unlinkSync(path); // hapus file
         res.json({ message: "CSV berhasil diproses!" });
-
       } catch (err) {
         console.error("DB ERROR:", err);
         res.status(500).json({ error: "Gagal menyimpan data ke database" });
       }
     });
 });
-
-// ==========================
-// KEEP-ALIVE UNTUK RAILWAY
-// ==========================
-setInterval(() => {
-  fetch("https://railwayuploadfixed-production.up.railway.app/")
-    .then(() => console.log("KeepAlive → OK"))
-    .catch(() => {});
-}, 280000);
-
-// ==========================
-// ANTI-CRASH RAILWAY
-// ==========================
-process.on("SIGTERM", () => console.log("SIGTERM received"));
-process.on("SIGINT", () => console.log("SIGINT received"));
 
 // ==========================
 // LISTEN WAJIB 0.0.0.0
