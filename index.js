@@ -14,7 +14,7 @@ const app = express();
 // CORS (AMAN UNTUK VERCEL & LOCALHOST)
 // ==========================
 app.use(cors({
-  origin: "*",
+  origin: "https://verceluploadfixied.vercel.app",
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"],
 }));
